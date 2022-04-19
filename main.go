@@ -9,9 +9,15 @@ import (
 	"math"
 	"math/cmplx"
 	"math/rand"
+	"os"
 	"sort"
 
 	"gonum.org/v1/gonum/mat"
+	"gonum.org/v1/gonum/stat"
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/vg"
+	"gonum.org/v1/plot/vg/draw"
 
 	"github.com/pointlander/pagerank"
 )
@@ -130,4 +136,61 @@ func main() {
 		fmt.Printf("\n")
 	}
 	fmt.Printf("\n")
+
+	ranks := mat.NewDense(Size, Size, nil)
+	for i := 0; i < Size; i++ {
+		for j := 0; j < Size; j++ {
+			ranks.Set(i, j, real(vectors.At(i, j)))
+		}
+	}
+	Reduction("results", ranks)
+}
+
+// Reduction reduces the matrix
+func Reduction(name string, ranks *mat.Dense) {
+	var pc stat.PC
+	ok := pc.PrincipalComponents(ranks, nil)
+	if !ok {
+		panic("PrincipalComponents failed")
+	}
+	k := 2
+	var proj mat.Dense
+	var vec mat.Dense
+	pc.VectorsTo(&vec)
+	proj.Mul(ranks, vec.Slice(0, Size, 0, k))
+
+	fmt.Printf("\n")
+	points := make(plotter.XYs, 0, 8)
+	for i := 0; i < Size; i++ {
+		fmt.Println(proj.At(i, 0), proj.At(i, 1))
+		points = append(points, plotter.XY{X: proj.At(i, 0), Y: proj.At(i, 1)})
+	}
+
+	p := plot.New()
+
+	p.Title.Text = "x vs y"
+	p.X.Label.Text = "x"
+	p.Y.Label.Text = "y"
+
+	scatter, err := plotter.NewScatter(points)
+	if err != nil {
+		panic(err)
+	}
+	scatter.GlyphStyle.Radius = vg.Length(3)
+	scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+	p.Add(scatter)
+
+	err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%s.png", name))
+	if err != nil {
+		panic(err)
+	}
+
+	output, err := os.Create(fmt.Sprintf("%s.dat", name))
+	if err != nil {
+		panic(err)
+	}
+	defer output.Close()
+	for _, point := range points {
+		fmt.Fprintf(output, "%f %f\n", point.X, point.Y)
+	}
 }
