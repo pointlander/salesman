@@ -1,2 +1,4 @@
 github.com/pointlander/pagerank v0.0.0-20210619221740-830548a59275 h1:KF7JT+ypSI82OfOEGVdNBM31o5+7NuFuuenR3quajVc=
 github.com/pointlander/pagerank v0.0.0-20210619221740-830548a59275/go.mod h1:9UawvzpkRT8gwNLM8E8JdGnn6p1kHqEdV+P8TlDZibk=
+gonum.org/v1/gonum v0.11.0 h1:f1IJhK4Km5tBJmaiJXtk/PkL4cdVX6J+tGiM187uT5E=
+gonum.org/v1/gonum v0.11.0/go.mod h1:fSG4YDCxxUZQJ7rKsQrj0gMOg00Il0Z96/qMA4bVQhA=
