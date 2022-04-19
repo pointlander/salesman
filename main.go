@@ -166,6 +166,22 @@ func Reduction(name string, ranks *mat.Dense) {
 		points = append(points, plotter.XY{X: proj.At(i, 0), Y: proj.At(i, 1)})
 	}
 
+	for i := 0; i < Size; i++ {
+		fmt.Printf("%d ", i)
+		a0, b0 := proj.At(i, 0), proj.At(i, 1)
+		for j := 0; j < Size; j++ {
+			if i == j {
+				fmt.Printf("(%d 0) ", j)
+				continue
+			}
+			a1, b1 := proj.At(j, 0), proj.At(j, 1)
+			a, b := a0-a1, b0-b1
+			distance := math.Sqrt(a*a + b*b)
+			fmt.Printf("(%d %f) ", j, distance)
+		}
+		fmt.Printf("\n")
+	}
+
 	p := plot.New()
 
 	p.Title.Text = "x vs y"
