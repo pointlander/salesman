@@ -29,13 +29,13 @@ func main() {
 		42, 30, 0, 12,
 		35, 34, 12, 0,
 	}
-	for i := 0; i < Size; i++ {
+	/*for i := 0; i < Size; i++ {
 		for j := i + 1; j < Size; j++ {
 			value := float64(rand.Intn(8) + 1)
 			a[i*4+j] = value
 			a[j*4+i] = value
 		}
-	}
+	}*/
 	for i := 0; i < Size; i++ {
 		for j := 0; j < Size; j++ {
 			fmt.Printf("%f ", a[i*4+j])
@@ -85,7 +85,7 @@ func main() {
 		Rank float64
 	}
 	cities := make([]City, 0, 8)
-	graph.Rank(1, 0.000001, func(node uint64, rank float64) {
+	graph.Rank(.85, 0.000001, func(node uint64, rank float64) {
 		cities = append(cities, City{
 			ID:   node,
 			Rank: rank,
