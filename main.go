@@ -6,23 +6,69 @@ package main
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
 	"sort"
-	"strconv"
 
 	"github.com/pointlander/pagerank"
 )
 
 func main() {
-	verify()
+	rand.Seed(1)
 	a := []float64{
 		0, 20, 42, 35,
 		20, 0, 30, 34,
 		42, 30, 0, 12,
 		35, 34, 12, 0,
 	}
+	for i := 0; i < 4; i++ {
+		for j := i + 1; j < 4; j++ {
+			value := float64(rand.Intn(8) + 1)
+			a[i*4+j] = value
+			a[j*4+i] = value
+		}
+	}
+	for i := 0; i < 4; i++ {
+		for j := 0; j < 4; j++ {
+			fmt.Printf("%f ", a[i*4+j])
+		}
+		fmt.Printf("\n")
+	}
+	var search func(sum float64, i int, nodes []int, visited [4]bool) (float64, []int)
+	search = func(sum float64, i int, nodes []int, visited [4]bool) (float64, []int) {
+		smallest, cities := math.MaxFloat64, nodes
+		visited[i] = true
+		skipped := true
+		for j, skip := range visited {
+			if skip {
+				continue
+			}
+			skipped = false
+			value, x := search(sum+a[i*4+j], j, append(nodes, j), visited)
+			if value < smallest {
+				smallest, cities = value, x
+			}
+		}
+		if skipped {
+			return sum + a[i*4+nodes[0]], append(cities, nodes[0])
+		}
+		return smallest, cities
+	}
+	sum, nodes := search(0, 0, []int{0}, [4]bool{})
+	for i := 1; i < 4; i++ {
+		s, n := search(0, i, []int{i}, [4]bool{})
+		if s < sum {
+			sum, nodes = s, n
+		}
+	}
+	fmt.Println(sum, nodes)
+
 	graph := pagerank.NewGraph64()
 	for i := 0; i < 4; i++ {
 		for j := 0; j < 4; j++ {
+			if i == j {
+				continue
+			}
 			graph.Link(uint64(i), uint64(j), a[i*4+j])
 		}
 	}
@@ -31,7 +77,7 @@ func main() {
 		Rank float64
 	}
 	cities := make([]City, 0, 8)
-	graph.Rank(0.85, 0.000001, func(node uint64, rank float64) {
+	graph.Rank(1, 0.000001, func(node uint64, rank float64) {
 		cities = append(cities, City{
 			ID:   node,
 			Rank: rank,
@@ -41,95 +87,16 @@ func main() {
 		return cities[i].Rank < cities[j].Rank
 	})
 	fmt.Println(cities)
-}
-
-// https://kommradhomer.medium.com/my-lazy-take-on-travelling-salesman-problem-in-golang-f7b913878c5
-func verify() {
-	var cities = [4][4]int{
-		{0, 20, 42, 35},
-		{20, 0, 30, 34},
-		{42, 30, 0, 12},
-		{35, 34, 12, 0},
+	pageNodes := make([]uint64, 0, 8)
+	pageNodes = append(pageNodes, cities[len(cities)-1].ID)
+	for _, city := range cities {
+		pageNodes = append(pageNodes, city.ID)
 	}
-
-	gg := permutation([]int{1, 2, 3})
-
-	total := 0
-
-	shortestDistance := -1
-	shortestPaths := []string{}
-
-	for _, elem := range gg {
-
-		fmt.Println("route:", routesToStr(elem))
-
-		lastCity := 0
-
-		for _, city := range elem {
-
-			total += cities[lastCity][city]
-
-			lastCity = city
-		}
-
-		total += cities[lastCity][0]
-
-		fmt.Println("total distance:", total)
-
-		if shortestDistance == -1 || shortestDistance > total {
-
-			shortestDistance = total
-			shortestPaths = append(shortestPaths, routesToStr(elem))
-		}
-
-		total = 0
-
+	total := 0.0
+	last := pageNodes[0]
+	for _, node := range pageNodes[1:] {
+		total += a[last*4+node]
+		last = node
 	}
-
-	fmt.Println()
-	fmt.Println()
-	fmt.Println("shortestDistance:", shortestDistance)
-	fmt.Println("shortestPaths:", shortestPaths)
-}
-
-func permutation(xs []int) (permuts [][]int) {
-	var rc func([]int, int)
-	rc = func(a []int, k int) {
-		if k == len(a) {
-			permuts = append(permuts, append([]int{}, a...))
-		} else {
-			for i := k; i < len(xs); i++ {
-				a[k], a[i] = a[i], a[k]
-				rc(a, k+1)
-				a[k], a[i] = a[i], a[k]
-			}
-		}
-	}
-	rc(xs, 0)
-
-	return permuts
-}
-
-func rangeSlice(start, stop int) []int {
-	if start > stop {
-		panic("Slice ends before it started")
-	}
-	xs := make([]int, stop-start)
-	for i := 0; i < len(xs); i++ {
-		xs[i] = i + 1 + start
-	}
-	return xs
-}
-
-func routesToStr(arr []int) string {
-	result := "(0,"
-
-	for _, o := range arr {
-		result += strconv.Itoa(o)
-		result += ","
-	}
-
-	result += "0)"
-
-	return result
+	fmt.Println(total, pageNodes)
 }
