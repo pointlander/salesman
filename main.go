@@ -53,6 +53,7 @@ func test() bool {
 		35, 34, 12, 0,
 	}
 	if !*FlagDebug {
+		a = make([]float64, Size*Size)
 		for i := 0; i < Size; i++ {
 			for j := i + 1; j < Size; j++ {
 				value := float64(rand.Intn(8) + 1)
@@ -69,8 +70,8 @@ func test() bool {
 			fmt.Printf("\n")
 		}
 	}
-	var search func(sum float64, i int, nodes []int, visited [4]bool) (float64, []int)
-	search = func(sum float64, i int, nodes []int, visited [4]bool) (float64, []int) {
+	var search func(sum float64, i int, nodes []int, visited [Size]bool) (float64, []int)
+	search = func(sum float64, i int, nodes []int, visited [Size]bool) (float64, []int) {
 		smallest, cities := math.MaxFloat64, nodes
 		visited[i] = true
 		skipped := true
