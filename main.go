@@ -200,13 +200,19 @@ func test() bool {
 		loop = append(loop, state)
 		for i := 0; i < Size; i++ {
 			min, k := math.MaxFloat64, 0
+			done := true
 			for j := 0; j < Size; j++ {
 				if j == state || visited[j] {
 					continue
 				}
+				done = false
 				if v := distances[state*Size+j]; v < min {
 					min, k = v, j
 				}
+			}
+			if done {
+				loop = append(loop, loop[0])
+				break
 			}
 			state = k
 			visited[state] = true
