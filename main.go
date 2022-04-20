@@ -42,7 +42,7 @@ func main() {
 			count++
 		}
 	}
-	fmt.Println(count)
+	fmt.Println(float64(count) / 1024.0)
 }
 
 func test() bool {
@@ -56,15 +56,15 @@ func test() bool {
 		for i := 0; i < Size; i++ {
 			for j := i + 1; j < Size; j++ {
 				value := float64(rand.Intn(8) + 1)
-				a[i*4+j] = value
-				a[j*4+i] = value
+				a[i*Size+j] = value
+				a[j*Size+i] = value
 			}
 		}
 	}
 	if *FlagDebug {
 		for i := 0; i < Size; i++ {
 			for j := 0; j < Size; j++ {
-				fmt.Printf("%f ", a[i*4+j])
+				fmt.Printf("%f ", a[i*Size+j])
 			}
 			fmt.Printf("\n")
 		}
@@ -90,7 +90,7 @@ func test() bool {
 		return smallest, cities
 	}
 	sum, nodes := search(0, 0, []int{0}, [Size]bool{})
-	for i := 1; i < 4; i++ {
+	for i := 1; i < Size; i++ {
 		s, n := search(0, i, []int{i}, [Size]bool{})
 		if s < sum {
 			sum, nodes = s, n
@@ -101,8 +101,8 @@ func test() bool {
 	}
 
 	graph := pagerank.NewGraph64()
-	for i := 0; i < 4; i++ {
-		for j := 0; j < 4; j++ {
+	for i := 0; i < Size; i++ {
+		for j := 0; j < Size; j++ {
 			if i == j {
 				continue
 			}
@@ -192,7 +192,7 @@ func test() bool {
 	}
 	minTotal, minLoop := math.MaxFloat64, make([]int, 0, 8)
 	for offset := 0; offset < Size; offset++ {
-		visited := [4]bool{}
+		visited := [Size]bool{}
 		state := offset
 		visited[state] = true
 		total, loop := 0.0, make([]int, 0, 8)
