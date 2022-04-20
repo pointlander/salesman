@@ -5,6 +5,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math"
 	"math/cmplx"
@@ -27,26 +28,46 @@ const (
 	Size = 4
 )
 
+var (
+	// FlagDebug debug mode
+	FlagDebug = flag.Bool("debug", false, "debug mode")
+)
+
 func main() {
+	flag.Parse()
 	rand.Seed(1)
+	count := 0
+	for i := 0; i < 1024; i++ {
+		if test() {
+			count++
+		}
+	}
+	fmt.Println(count)
+}
+
+func test() bool {
 	a := []float64{
 		0, 20, 42, 35,
 		20, 0, 30, 34,
 		42, 30, 0, 12,
 		35, 34, 12, 0,
 	}
-	/*for i := 0; i < Size; i++ {
-		for j := i + 1; j < Size; j++ {
-			value := float64(rand.Intn(8) + 1)
-			a[i*4+j] = value
-			a[j*4+i] = value
+	if !*FlagDebug {
+		for i := 0; i < Size; i++ {
+			for j := i + 1; j < Size; j++ {
+				value := float64(rand.Intn(8) + 1)
+				a[i*4+j] = value
+				a[j*4+i] = value
+			}
 		}
-	}*/
-	for i := 0; i < Size; i++ {
-		for j := 0; j < Size; j++ {
-			fmt.Printf("%f ", a[i*4+j])
+	}
+	if *FlagDebug {
+		for i := 0; i < Size; i++ {
+			for j := 0; j < Size; j++ {
+				fmt.Printf("%f ", a[i*4+j])
+			}
+			fmt.Printf("\n")
 		}
-		fmt.Printf("\n")
 	}
 	var search func(sum float64, i int, nodes []int, visited [4]bool) (float64, []int)
 	search = func(sum float64, i int, nodes []int, visited [4]bool) (float64, []int) {
@@ -75,7 +96,9 @@ func main() {
 			sum, nodes = s, n
 		}
 	}
-	fmt.Println(sum, nodes)
+	if *FlagDebug {
+		fmt.Println(sum, nodes)
+	}
 
 	graph := pagerank.NewGraph64()
 	for i := 0; i < 4; i++ {
@@ -100,7 +123,9 @@ func main() {
 	sort.Slice(cities, func(i, j int) bool {
 		return cities[i].Rank < cities[j].Rank
 	})
-	fmt.Println(cities)
+	if *FlagDebug {
+		fmt.Println(cities)
+	}
 	pageNodes := make([]uint64, 0, 8)
 	pageNodes = append(pageNodes, cities[len(cities)-1].ID)
 	for _, city := range cities {
@@ -112,7 +137,9 @@ func main() {
 		total += a[last*Size+node]
 		last = node
 	}
-	fmt.Println(total, pageNodes)
+	if *FlagDebug {
+		fmt.Println(total, pageNodes)
+	}
 
 	adjacency := mat.NewDense(Size, Size, a)
 	var eig mat.Eigen
@@ -122,20 +149,80 @@ func main() {
 	}
 
 	values := eig.Values(nil)
-	for i, value := range values {
-		fmt.Println(i, value, cmplx.Abs(value), cmplx.Phase(value))
-	}
-	fmt.Printf("\n")
-
-	vectors := mat.CDense{}
-	eig.VectorsTo(&vectors)
-	for i := 0; i < Size; i++ {
-		for j := 0; j < Size; j++ {
-			fmt.Printf("%f ", vectors.At(i, j))
+	if *FlagDebug {
+		for i, value := range values {
+			fmt.Println(i, value, cmplx.Abs(value), cmplx.Phase(value))
 		}
 		fmt.Printf("\n")
 	}
-	fmt.Printf("\n")
+
+	vectors := mat.CDense{}
+	eig.VectorsTo(&vectors)
+	if *FlagDebug {
+		for i := 0; i < Size; i++ {
+			for j := 0; j < Size; j++ {
+				fmt.Printf("%f ", vectors.At(i, j))
+			}
+			fmt.Printf("\n")
+		}
+		fmt.Printf("\n")
+	}
+
+	distances := make([]float64, Size*Size)
+	for i := 0; i < Size; i++ {
+		for j := 0; j < Size; j++ {
+			if i == j {
+				continue
+			}
+			sum := 0.0
+			for k := 0; k < Size; k++ {
+				x := real(values[k]*vectors.At(i, k)) - real(values[k]*vectors.At(j, k))
+				sum += x * x
+			}
+			distances[i*Size+j] = math.Sqrt(sum)
+		}
+	}
+	if *FlagDebug {
+		for i := 0; i < Size; i++ {
+			for j := 0; j < Size; j++ {
+				fmt.Printf("%f ", distances[i*Size+j])
+			}
+			fmt.Printf("\n")
+		}
+	}
+	minTotal, minLoop := math.MaxFloat64, make([]int, 0, 8)
+	for offset := 0; offset < Size; offset++ {
+		visited := [4]bool{}
+		state := offset
+		visited[state] = true
+		total, loop := 0.0, make([]int, 0, 8)
+		loop = append(loop, state)
+		for i := 0; i < Size; i++ {
+			min, k := math.MaxFloat64, 0
+			for j := 0; j < Size; j++ {
+				if j == state || visited[j] {
+					continue
+				}
+				if v := distances[state*Size+j]; v < min {
+					min, k = v, j
+				}
+			}
+			state = k
+			visited[state] = true
+			loop = append(loop, state)
+		}
+		last := loop[0]
+		for _, node := range loop[1:] {
+			total += a[last*Size+node]
+			last = node
+		}
+		if total < minTotal && loop[0] == loop[Size] {
+			minTotal, minLoop = total, loop
+		}
+	}
+	if *FlagDebug {
+		fmt.Println(minTotal, minLoop)
+	}
 
 	ranks := mat.NewDense(Size, Size, nil)
 	for i := 0; i < Size; i++ {
@@ -143,7 +230,11 @@ func main() {
 			ranks.Set(i, j, real(vectors.At(i, j)))
 		}
 	}
-	Reduction("results", ranks)
+	if *FlagDebug {
+		Reduction("results", ranks)
+	}
+
+	return sum == minTotal
 }
 
 // Reduction reduces the matrix
