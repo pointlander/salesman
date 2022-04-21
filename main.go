@@ -45,31 +45,8 @@ func main() {
 	fmt.Println(float64(count) / 1024.0)
 }
 
-func test() bool {
-	a := []float64{
-		0, 20, 42, 35,
-		20, 0, 30, 34,
-		42, 30, 0, 12,
-		35, 34, 12, 0,
-	}
-	if !*FlagDebug {
-		a = make([]float64, Size*Size)
-		for i := 0; i < Size; i++ {
-			for j := i + 1; j < Size; j++ {
-				value := float64(rand.Intn(8) + 1)
-				a[i*Size+j] = value
-				a[j*Size+i] = value
-			}
-		}
-	}
-	if *FlagDebug {
-		for i := 0; i < Size; i++ {
-			for j := 0; j < Size; j++ {
-				fmt.Printf("%f ", a[i*Size+j])
-			}
-			fmt.Printf("\n")
-		}
-	}
+// Search searches for a solution to the traveling salesman problem
+func Search(a []float64) (float64, []int) {
 	var search func(sum float64, i int, nodes []int, visited [Size]bool) (float64, []int)
 	search = func(sum float64, i int, nodes []int, visited [Size]bool) (float64, []int) {
 		smallest, cities := math.MaxFloat64, nodes
@@ -100,7 +77,11 @@ func test() bool {
 	if *FlagDebug {
 		fmt.Println(sum, nodes)
 	}
+	return sum, nodes
+}
 
+// PageRank uses page rank to solve the traveling salesman problem
+func PageRank(a []float64) (float64, []uint64) {
 	graph := pagerank.NewGraph64()
 	for i := 0; i < Size; i++ {
 		for j := 0; j < Size; j++ {
@@ -141,7 +122,11 @@ func test() bool {
 	if *FlagDebug {
 		fmt.Println(total, pageNodes)
 	}
+	return total, pageNodes
+}
 
+// Eigen uses eigen vectors to solve the traveling salesman problem
+func Eigen(a []float64) (*mat.CDense, float64, []int) {
 	adjacency := mat.NewDense(Size, Size, a)
 	var eig mat.Eigen
 	ok := eig.Factorize(adjacency, mat.EigenRight)
@@ -230,6 +215,39 @@ func test() bool {
 	if *FlagDebug {
 		fmt.Println(minTotal, minLoop)
 	}
+	return &vectors, minTotal, minLoop
+}
+
+func test() bool {
+	a := []float64{
+		0, 20, 42, 35,
+		20, 0, 30, 34,
+		42, 30, 0, 12,
+		35, 34, 12, 0,
+	}
+	if !*FlagDebug {
+		a = make([]float64, Size*Size)
+		for i := 0; i < Size; i++ {
+			for j := i + 1; j < Size; j++ {
+				value := float64(rand.Intn(8) + 1)
+				a[i*Size+j] = value
+				a[j*Size+i] = value
+			}
+		}
+	}
+	if *FlagDebug {
+		for i := 0; i < Size; i++ {
+			for j := 0; j < Size; j++ {
+				fmt.Printf("%f ", a[i*Size+j])
+			}
+			fmt.Printf("\n")
+		}
+	}
+
+	sum, nodes := Search(a)
+	total, pageNodes := PageRank(a)
+	vectors, minTotal, minLoop := Eigen(a)
+	_, _, _, _ = nodes, total, pageNodes, minLoop
 
 	ranks := mat.NewDense(Size, Size, nil)
 	for i := 0; i < Size; i++ {
