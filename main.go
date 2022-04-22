@@ -188,26 +188,21 @@ func Eigen(a []float64) (*mat.CDense, float64, []int) {
 		visited[state] = true
 		total, loop := 0.0, make([]int, 0, 8)
 		loop = append(loop, state)
-		for i := 0; i < Size; i++ {
+		for i := 0; i < Size-1; i++ {
 			min, k := math.MaxFloat64, 0
-			done := true
 			for j := 0; j < Size; j++ {
 				if j == state || visited[j] {
 					continue
 				}
-				done = false
 				if v := distances[state*Size+j]; v < min {
 					min, k = v, j
 				}
-			}
-			if done {
-				loop = append(loop, loop[0])
-				break
 			}
 			state = k
 			visited[state] = true
 			loop = append(loop, state)
 		}
+		loop = append(loop, loop[0])
 		last := loop[0]
 		for _, node := range loop[1:] {
 			total += a[last*Size+node]
