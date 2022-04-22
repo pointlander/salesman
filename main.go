@@ -134,7 +134,7 @@ func PageRank(a []float64) (float64, []uint64) {
 func Eigen(a []float64) (*mat.CDense, float64, []int) {
 	adjacency := mat.NewDense(Size, Size, a)
 	var eig mat.Eigen
-	ok := eig.Factorize(adjacency, mat.EigenRight)
+	ok := eig.Factorize(adjacency, mat.EigenBoth)
 	if !ok {
 		panic("Eigendecomposition failed")
 	}
@@ -153,6 +153,18 @@ func Eigen(a []float64) (*mat.CDense, float64, []int) {
 		for i := 0; i < Size; i++ {
 			for j := 0; j < Size; j++ {
 				fmt.Printf("%f ", vectors.At(i, j))
+			}
+			fmt.Printf("\n")
+		}
+		fmt.Printf("\n")
+	}
+
+	leftVectors := mat.CDense{}
+	eig.LeftVectorsTo(&leftVectors)
+	if *FlagDebug {
+		for i := 0; i < Size; i++ {
+			for j := 0; j < Size; j++ {
+				fmt.Printf("%f ", leftVectors.At(i, j))
 			}
 			fmt.Printf("\n")
 		}
@@ -181,6 +193,30 @@ func Eigen(a []float64) (*mat.CDense, float64, []int) {
 			fmt.Printf("\n")
 		}
 	}
+
+	leftDistances := make([]float64, Size*Size)
+	for i := 0; i < Size; i++ {
+		for j := 0; j < Size; j++ {
+			if i == j {
+				continue
+			}
+			sum := 0.0
+			for k := 0; k < Size; k++ {
+				x := real(values[k]*leftVectors.At(i, k)) - real(values[k]*leftVectors.At(j, k))
+				sum += x * x
+			}
+			distances[i*Size+j] = math.Sqrt(sum)
+		}
+	}
+	if *FlagDebug {
+		for i := 0; i < Size; i++ {
+			for j := 0; j < Size; j++ {
+				fmt.Printf("%f ", leftDistances[i*Size+j])
+			}
+			fmt.Printf("\n")
+		}
+	}
+
 	minTotal, minLoop := math.MaxFloat64, make([]int, 0, 8)
 	for offset := 0; offset < Size; offset++ {
 		visited := [Size]bool{}
@@ -195,6 +231,37 @@ func Eigen(a []float64) (*mat.CDense, float64, []int) {
 					continue
 				}
 				if v := distances[state*Size+j]; v < min {
+					min, k = v, j
+				}
+			}
+			state = k
+			visited[state] = true
+			loop = append(loop, state)
+		}
+		loop = append(loop, loop[0])
+		last := loop[0]
+		for _, node := range loop[1:] {
+			total += a[last*Size+node]
+			last = node
+		}
+		if total < minTotal && loop[0] == loop[Size] {
+			minTotal, minLoop = total, loop
+		}
+	}
+
+	for offset := 0; offset < Size; offset++ {
+		visited := [Size]bool{}
+		state := offset
+		visited[state] = true
+		total, loop := 0.0, make([]int, 0, 8)
+		loop = append(loop, state)
+		for i := 0; i < Size-1; i++ {
+			min, k := math.MaxFloat64, 0
+			for j := 0; j < Size; j++ {
+				if j == state || visited[j] {
+					continue
+				}
+				if v := leftDistances[state*Size+j]; v < min {
 					min, k = v, j
 				}
 			}
@@ -410,6 +477,10 @@ func test() bool {
 	if *FlagDebug {
 		Reduction("results", ranks)
 	}
+
+	/*if sum != minTotal {
+		fmt.Println(sum, minTotal)
+	}*/
 
 	return sum == minTotal
 }
