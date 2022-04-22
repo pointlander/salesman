@@ -209,7 +209,7 @@ func Eigen(a []float64) (*mat.CDense, float64, []int) {
 				x := real(values[k]*leftVectors.At(i, k)) - real(values[k]*leftVectors.At(j, k))
 				sum += x * x
 			}
-			distances[i*Size+j] = math.Sqrt(sum) * a[i*Size+j]
+			leftDistances[i*Size+j] = math.Sqrt(sum) * a[i*Size+j]
 		}
 	}
 	if *FlagDebug {
