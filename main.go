@@ -41,13 +41,17 @@ func main() {
 		test()
 		return
 	}
-	count := 0
+	eigenCount, nnCount := 0, 0
 	for i := 0; i < 1024; i++ {
-		if test() {
-			count++
+		eigen, nn := test()
+		if eigen {
+			eigenCount++
+		}
+		if nn {
+			nnCount++
 		}
 	}
-	fmt.Println(float64(count) / 1024.0)
+	fmt.Println(float64(eigenCount)/1024.0, float64(nnCount)/1024.0)
 }
 
 // Search searches for a solution to the traveling salesman problem
@@ -182,7 +186,7 @@ func Eigen(a []float64) (*mat.CDense, float64, []int) {
 				x := real(values[k]*vectors.At(i, k)) - real(values[k]*vectors.At(j, k))
 				sum += x * x
 			}
-			distances[i*Size+j] = math.Sqrt(sum)
+			distances[i*Size+j] = math.Sqrt(sum) * a[i*Size+j]
 		}
 	}
 	if *FlagDebug {
@@ -205,7 +209,7 @@ func Eigen(a []float64) (*mat.CDense, float64, []int) {
 				x := real(values[k]*leftVectors.At(i, k)) - real(values[k]*leftVectors.At(j, k))
 				sum += x * x
 			}
-			distances[i*Size+j] = math.Sqrt(sum)
+			distances[i*Size+j] = math.Sqrt(sum) * a[i*Size+j]
 		}
 	}
 	if *FlagDebug {
@@ -283,6 +287,43 @@ func Eigen(a []float64) (*mat.CDense, float64, []int) {
 		fmt.Println(minTotal, minLoop)
 	}
 	return &vectors, minTotal, minLoop
+}
+
+// NearestNeighbor uses nearest neighbor to solve the traveling salesman problem
+func NearestNeighbor(a []float64) (float64, []int) {
+	distances := a
+	minTotal, minLoop := math.MaxFloat64, make([]int, 0, 8)
+	for offset := 0; offset < Size; offset++ {
+		visited := [Size]bool{}
+		state := offset
+		visited[state] = true
+		total, loop := 0.0, make([]int, 0, 8)
+		loop = append(loop, state)
+		for i := 0; i < Size-1; i++ {
+			min, k := math.MaxFloat64, 0
+			for j := 0; j < Size; j++ {
+				if j == state || visited[j] {
+					continue
+				}
+				if v := distances[state*Size+j]; v < min {
+					min, k = v, j
+				}
+			}
+			state = k
+			visited[state] = true
+			loop = append(loop, state)
+		}
+		loop = append(loop, loop[0])
+		last := loop[0]
+		for _, node := range loop[1:] {
+			total += a[last*Size+node]
+			last = node
+		}
+		if total < minTotal && loop[0] == loop[Size] {
+			minTotal, minLoop = total, loop
+		}
+	}
+	return minTotal, minLoop
 }
 
 // Neural uses a neural network to solve the traveling salesman problem
@@ -436,7 +477,7 @@ func Neural(a []float64) (float64, []int) {
 	return minTotal, minLoop
 }
 
-func test() bool {
+func test() (bool, bool) {
 	a := []float64{
 		0, 20, 42, 35,
 		20, 0, 30, 34,
@@ -464,9 +505,10 @@ func test() bool {
 
 	sum, nodes := Search(a)
 	total, pageNodes := PageRank(a)
-	vectors, minTotal, minLoop := Eigen(a)
+	vectors, eigenTotal, eigenLoop := Eigen(a)
+	nnTotal, nnLoop := NearestNeighbor(a)
 	//neuralTotal, neuralLoop := Neural(a)
-	_, _, _, _, _ = nodes, total, pageNodes, minLoop, minTotal
+	_, _, _, _, _ = nodes, total, pageNodes, eigenLoop, nnLoop
 
 	ranks := mat.NewDense(Size, Size, nil)
 	for i := 0; i < Size; i++ {
@@ -482,7 +524,7 @@ func test() bool {
 		fmt.Println(sum, minTotal)
 	}*/
 
-	return sum == minTotal
+	return sum == eigenTotal, sum == nnTotal
 }
 
 // Reduction reduces the matrix
