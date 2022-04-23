@@ -289,6 +289,103 @@ func Eigen(a []float64) (*mat.CDense, float64, []int) {
 	return &vectors, minTotal, minLoop
 }
 
+// Eigen2 uses eigen vectors to solve the traveling salesman problem
+func Eigen2(a []float64) (float64, []int) {
+	adjacency := mat.NewDense(Size, Size, a)
+	var eig mat.Eigen
+	ok := eig.Factorize(adjacency, mat.EigenBoth)
+	if !ok {
+		panic("Eigendecomposition failed")
+	}
+
+	values := eig.Values(nil)
+	if *FlagDebug {
+		for i, value := range values {
+			fmt.Println(i, value, cmplx.Abs(value), cmplx.Phase(value))
+		}
+		fmt.Printf("\n")
+	}
+
+	vectors := mat.CDense{}
+	eig.VectorsTo(&vectors)
+	if *FlagDebug {
+		for i := 0; i < Size; i++ {
+			for j := 0; j < Size; j++ {
+				fmt.Printf("%f ", vectors.At(i, j))
+			}
+			fmt.Printf("\n")
+		}
+		fmt.Printf("\n")
+	}
+
+	leftVectors := mat.CDense{}
+	eig.LeftVectorsTo(&leftVectors)
+	if *FlagDebug {
+		for i := 0; i < Size; i++ {
+			for j := 0; j < Size; j++ {
+				fmt.Printf("%f ", leftVectors.At(i, j))
+			}
+			fmt.Printf("\n")
+		}
+		fmt.Printf("\n")
+	}
+
+	type Node struct {
+		ID   int
+		Rank float64
+	}
+	nodes := make([]Node, 0, 8)
+	for i := 0; i < Size; i++ {
+		for j := 0; j < Size; j++ {
+			nodes = append(nodes, Node{
+				ID:   i,
+				Rank: math.Abs(real(values[j] * vectors.At(i, j))),
+			})
+			nodes = append(nodes, Node{
+				ID:   i,
+				Rank: math.Abs(real(values[j] * leftVectors.At(i, j))),
+			})
+		}
+	}
+	sort.Slice(nodes, func(i, j int) bool {
+		return nodes[i].Rank < nodes[j].Rank
+	})
+	if *FlagDebug {
+		for _, node := range nodes {
+			fmt.Println(node)
+		}
+	}
+
+	total, loop := math.MaxFloat64, make([]int, 0, 8)
+	for i := 0; i < len(nodes); i++ {
+		visited, l := make(map[int]bool), make([]int, 0, 8)
+		for _, node := range nodes[i%len(nodes):] {
+			if len(visited) == Size {
+				break
+			}
+			if visited[node.ID] {
+				continue
+			}
+			l = append(l, node.ID)
+			visited[node.ID] = true
+		}
+		if len(visited) < Size {
+			break
+		}
+		l = append(l, l[0])
+		last, t := l[0], 0.0
+		for _, node := range l[1:] {
+			t += a[last*Size+node]
+			last = node
+		}
+		if t < total {
+			total, loop = t, l
+		}
+	}
+
+	return total, loop
+}
+
 // NearestNeighbor uses nearest neighbor to solve the traveling salesman problem
 func NearestNeighbor(a []float64) (float64, []int) {
 	distances := a
@@ -503,12 +600,11 @@ func test() (bool, bool) {
 		}
 	}
 
-	sum, nodes := Search(a)
-	total, pageNodes := PageRank(a)
-	vectors, eigenTotal, eigenLoop := Eigen(a)
-	nnTotal, nnLoop := NearestNeighbor(a)
-	//neuralTotal, neuralLoop := Neural(a)
-	_, _, _, _, _ = nodes, total, pageNodes, eigenLoop, nnLoop
+	total0, loop0 := Search(a)
+	total1, loop1 := PageRank(a)
+	vectors, total2, loop2 := Eigen(a)
+	total3, loop3 := Eigen2(a)
+	total4, loop4 := NearestNeighbor(a)
 
 	ranks := mat.NewDense(Size, Size, nil)
 	for i := 0; i < Size; i++ {
@@ -517,14 +613,15 @@ func test() (bool, bool) {
 		}
 	}
 	if *FlagDebug {
+		fmt.Println("Search", total0, loop0)
+		fmt.Println("PageRank", total1, loop1)
+		fmt.Println("Eigen", total2, loop2)
+		fmt.Println("Eigen2", total3, loop3)
+		fmt.Println("NearestNeighbor", total4, loop4)
 		Reduction("results", ranks)
 	}
 
-	/*if sum != minTotal {
-		fmt.Println(sum, minTotal)
-	}*/
-
-	return sum == eigenTotal, sum == nnTotal
+	return total0 == total2, total0 == total4
 }
 
 // Reduction reduces the matrix
