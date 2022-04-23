@@ -339,11 +339,11 @@ func Eigen2(a []float64) (float64, []int) {
 		for j := 0; j < Size; j++ {
 			nodes = append(nodes, Node{
 				ID:   i,
-				Rank: math.Abs(real(values[j] * vectors.At(i, j))),
+				Rank: math.Abs(real(vectors.At(i, j))),
 			})
 			nodes = append(nodes, Node{
 				ID:   i,
-				Rank: math.Abs(real(values[j] * leftVectors.At(i, j))),
+				Rank: math.Abs(real(leftVectors.At(i, j))),
 			})
 		}
 	}
@@ -621,7 +621,7 @@ func test() (bool, bool) {
 		Reduction("results", ranks)
 	}
 
-	return total0 == total2, total0 == total4
+	return total0 == total3, total0 == total4
 }
 
 // Reduction reduces the matrix
