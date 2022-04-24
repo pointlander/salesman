@@ -13,6 +13,8 @@ import (
 	"os"
 	"sort"
 
+	"github.com/muesli/clusters"
+	"github.com/muesli/kmeans"
 	"gonum.org/v1/gonum/mat"
 	"gonum.org/v1/gonum/stat"
 	"gonum.org/v1/plot"
@@ -386,6 +388,138 @@ func Eigen2(a []float64) (float64, []int) {
 	return total, loop
 }
 
+// Coordinates is a slice of float64
+type Coordinates struct {
+	ID     int
+	Values []float64
+}
+
+// Coordinates implements the Observation interface for a plain set of float64
+// coordinates
+func (c Coordinates) Coordinates() clusters.Coordinates {
+	return clusters.Coordinates(c.Values)
+}
+
+// Distance returns the euclidean distance between two coordinates
+func (c Coordinates) Distance(p2 clusters.Coordinates) float64 {
+	var r float64
+	for i, v := range c.Values {
+		r += math.Pow(v-p2[i], 2)
+	}
+	return r
+}
+
+// EigenKMeans uses eigen vectors and kmeans to solve the traveling salesman problem
+func EigenKMeans(a []float64) (float64, []int) {
+	adjacency := mat.NewDense(Size, Size, a)
+	var eig mat.Eigen
+	ok := eig.Factorize(adjacency, mat.EigenBoth)
+	if !ok {
+		panic("Eigendecomposition failed")
+	}
+
+	values := eig.Values(nil)
+	if *FlagDebug {
+		for i, value := range values {
+			fmt.Println(i, value, cmplx.Abs(value), cmplx.Phase(value))
+		}
+		fmt.Printf("\n")
+	}
+
+	vectors := mat.CDense{}
+	eig.VectorsTo(&vectors)
+	if *FlagDebug {
+		for i := 0; i < Size; i++ {
+			for j := 0; j < Size; j++ {
+				fmt.Printf("%f ", vectors.At(i, j))
+			}
+			fmt.Printf("\n")
+		}
+		fmt.Printf("\n")
+	}
+
+	leftVectors := mat.CDense{}
+	eig.LeftVectorsTo(&leftVectors)
+	if *FlagDebug {
+		for i := 0; i < Size; i++ {
+			for j := 0; j < Size; j++ {
+				fmt.Printf("%f ", leftVectors.At(i, j))
+			}
+			fmt.Printf("\n")
+		}
+		fmt.Printf("\n")
+	}
+
+	min, max := math.MaxFloat64, -math.MaxFloat64
+	for r := 0; r < Size; r++ {
+		for c := 0; c < Size; c++ {
+			value := real(values[c] * vectors.At(r, c))
+			if value > max {
+				max = value
+			}
+			if value < min {
+				min = value
+			}
+		}
+	}
+	/*for r := 0; r < Size; r++ {
+		for c := 0; c < Size; c++ {
+			value := real(values[c] * leftVectors.At(r, c))
+			if value > max {
+				max = value
+			}
+			if value < min {
+				min = value
+			}
+		}
+	}*/
+	var d clusters.Observations
+	scale := max - min
+	for r := 0; r < Size; r++ {
+		row := Coordinates{
+			ID: r,
+		}
+		for c := 0; c < Size; c++ {
+			row.Values = append(row.Values, (real(values[c]*vectors.At(r, c))-min)/scale)
+		}
+		d = append(d, row)
+	}
+	/*for r := 0; r < Size; r++ {
+		row := Coordinates{
+			ID: id,
+		}
+		for c := 0; c < Size; c++ {
+			row.Values = append(row.Values, (real(values[c]*leftVectors.At(r, c))-min)/scale)
+		}
+		d = append(d, row)
+	}*/
+
+	km := kmeans.New()
+	clusters, err := km.Partition(d, 2)
+	if err != nil {
+		panic(err)
+	}
+	if *FlagDebug {
+		size := 0
+		values := make([]float64, 0, 8)
+		for _, c := range clusters {
+			values = append(values, c.Center...)
+			size++
+			for _, observation := range c.Observations {
+				size++
+				values = append(values, observation.(Coordinates).Values...)
+			}
+			fmt.Printf("Centered at x: %v\n", c.Center)
+			fmt.Printf("Matching data points: %+v\n\n", c.Observations)
+		}
+		ranks := mat.NewDense(size, Size, values)
+		fmt.Println(ranks)
+		Reduction("kmeans", ranks)
+	}
+
+	return 0, nil
+}
+
 // NearestNeighbor uses nearest neighbor to solve the traveling salesman problem
 func NearestNeighbor(a []float64) (float64, []int) {
 	distances := a
@@ -605,6 +739,7 @@ func test() (bool, bool) {
 	vectors, total2, loop2 := Eigen(a)
 	total3, loop3 := Eigen2(a)
 	total4, loop4 := NearestNeighbor(a)
+	EigenKMeans(a)
 
 	ranks := mat.NewDense(Size, Size, nil)
 	for i := 0; i < Size; i++ {
@@ -639,12 +774,14 @@ func Reduction(name string, ranks *mat.Dense) {
 
 	fmt.Printf("\n")
 	points := make(plotter.XYs, 0, 8)
-	for i := 0; i < Size; i++ {
+	r, _ := ranks.Caps()
+	fmt.Println(r)
+	for i := 0; i < r; i++ {
 		fmt.Println(proj.At(i, 0), proj.At(i, 1))
 		points = append(points, plotter.XY{X: proj.At(i, 0), Y: proj.At(i, 1)})
 	}
 
-	for i := 0; i < Size; i++ {
+	for i := 0; i < r; i++ {
 		fmt.Printf("%d ", i)
 		a0, b0 := proj.At(i, 0), proj.At(i, 1)
 		for j := 0; j < Size; j++ {
