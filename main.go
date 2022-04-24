@@ -13,8 +13,6 @@ import (
 	"os"
 	"sort"
 
-	"github.com/muesli/clusters"
-	"github.com/muesli/kmeans"
 	"gonum.org/v1/gonum/mat"
 	"gonum.org/v1/gonum/stat"
 	"gonum.org/v1/plot"
@@ -24,6 +22,8 @@ import (
 
 	"github.com/pointlander/gradient/tf64"
 	"github.com/pointlander/pagerank"
+	"github.com/pointlander/salesman/clusters"
+	"github.com/pointlander/salesman/kmeans"
 )
 
 const (
