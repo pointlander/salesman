@@ -3,7 +3,6 @@ package clusters
 import (
 	"fmt"
 	"math/rand"
-	"time"
 )
 
 // A Cluster which data points gravitate around
@@ -25,11 +24,11 @@ func New(k int, dataset Observations) (Clusters, error) {
 		return c, fmt.Errorf("k must be greater than 0")
 	}
 
-	rand.Seed(time.Now().UnixNano())
+	rnd := rand.New(rand.NewSource(1))
 	for i := 0; i < k; i++ {
 		var p Coordinates
 		for j := 0; j < len(dataset[0].Coordinates()); j++ {
-			p = append(p, rand.Float64())
+			p = append(p, rnd.Float64())
 		}
 
 		c = append(c, Cluster{
