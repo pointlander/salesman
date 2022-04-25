@@ -711,8 +711,8 @@ func Neural(a []float64) (float64, []int) {
 // Neural2 uses a neural network to solve the traveling salesman problem
 func Neural2(a []float64) (float64, []int) {
 	data := tf64.NewSet()
-	data.Add("nodes", Size, Size*Size-Size)
-	data.Add("distances", 1, Size*Size-Size)
+	data.Add("nodes", Size, Size*Size)
+	data.Add("distances", 1, Size*Size)
 
 	inputs := tf64.NewSet()
 	inputs.Add("inputs", Size, 1)
@@ -722,9 +722,6 @@ func Neural2(a []float64) (float64, []int) {
 	nodes, distances := data.Weights[0], data.Weights[1]
 	for i := 0; i < Size; i++ {
 		for j := 0; j < Size; j++ {
-			if i == j {
-				continue
-			}
 			inputs := make([]float64, 4)
 			inputs[i] = 1
 			inputs[j] = 1
