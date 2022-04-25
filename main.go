@@ -708,6 +708,195 @@ func Neural(a []float64) (float64, []int) {
 	return minTotal, minLoop
 }
 
+// Neural2 uses a neural network to solve the traveling salesman problem
+func Neural2(a []float64) (float64, []int) {
+	data := tf64.NewSet()
+	data.Add("nodes", Size, Size*Size-Size)
+	data.Add("distances", 1, Size*Size-Size)
+
+	inputs := tf64.NewSet()
+	inputs.Add("inputs", Size, 1)
+	in := inputs.Weights[0]
+	in.X = in.X[:cap(in.X)]
+
+	nodes, distances := data.Weights[0], data.Weights[1]
+	for i := 0; i < Size; i++ {
+		for j := 0; j < Size; j++ {
+			if i == j {
+				continue
+			}
+			inputs := make([]float64, 4)
+			inputs[i] = 1
+			inputs[j] = 1
+			nodes.X = append(nodes.X, inputs...)
+			distances.X = append(distances.X, a[i*Size+j])
+		}
+	}
+
+	set := tf64.NewSet()
+	set.Add("aw", Size, Size)
+	set.Add("ab", Size)
+	set.Add("bw", Size, 1)
+	set.Add("bb", 1, 1)
+
+	for _, w := range set.Weights {
+		factor := math.Sqrt(2.0 / float64(w.S[0]))
+		for i := 0; i < cap(w.X); i++ {
+			w.X = append(w.X, rand.NormFloat64()*factor)
+		}
+	}
+
+	deltas := make([][]float64, 0, 8)
+	for _, p := range set.Weights {
+		deltas = append(deltas, make([]float64, len(p.X)))
+	}
+
+	l1 := tf64.Sigmoid(tf64.Add(tf64.Mul(set.Get("aw"), data.Get("nodes")), set.Get("ab")))
+	l2 := tf64.Add(tf64.Mul(set.Get("bw"), l1), set.Get("bb"))
+	cost := tf64.Avg(tf64.Quadratic(l2, data.Get("distances")))
+
+	alpha, eta, iterations := .3, .3, 1024
+	points := make(plotter.XYs, 0, iterations)
+	i := 0
+	for i < iterations {
+		total := 0.0
+		data.Zero()
+		set.Zero()
+
+		total += tf64.Gradient(cost).X[0]
+		sum := 0.0
+		for _, p := range set.Weights {
+			for _, d := range p.D {
+				sum += d * d
+			}
+		}
+		norm := math.Sqrt(sum)
+		scaling := 1.0
+		if norm > 1 {
+			scaling = 1 / norm
+		}
+
+		for j, w := range set.Weights {
+			for k, d := range w.D {
+				deltas[j][k] = alpha*deltas[j][k] - eta*d*scaling
+				set.Weights[j].X[k] += deltas[j][k]
+			}
+		}
+
+		points = append(points, plotter.XY{X: float64(i), Y: total})
+		if *FlagDebug {
+			fmt.Println(i, total)
+		}
+		if total < .0001 {
+			break
+		}
+		i++
+	}
+
+	if *FlagDebug {
+		p := plot.New()
+
+		p.Title.Text = "epochs vs cost"
+		p.X.Label.Text = "epochs"
+		p.Y.Label.Text = "cost"
+
+		scatter, err := plotter.NewScatter(points)
+		if err != nil {
+			panic(err)
+		}
+		scatter.GlyphStyle.Radius = vg.Length(1)
+		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+		p.Add(scatter)
+
+		err = p.Save(8*vg.Inch, 8*vg.Inch, "cost_neural.png")
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	l1 = tf64.Sigmoid(tf64.Add(tf64.Mul(set.Get("aw"), inputs.Get("inputs")), set.Get("ab")))
+	l2 = tf64.Add(tf64.Mul(set.Get("bw"), l1), set.Get("bb"))
+
+	if *FlagDebug {
+		for i := 0; i < Size; i++ {
+			for j := 0; j < Size; j++ {
+				in.X[j] = 0
+			}
+			in.X[i] = 1
+			l2(func(a *tf64.V) bool {
+				fmt.Println(i, a.X[0])
+				return true
+			})
+		}
+	}
+
+	aw := set.Weights[0]
+	ab := set.Weights[1]
+	bw := set.Weights[2]
+	distance := make([]float64, Size*Size)
+	for i := 0; i < Size; i++ {
+		for j := 0; j < Size; j++ {
+			if i == j {
+				continue
+			}
+			sum := 0.0
+			for k := 0; k < Size; k++ {
+				x := (aw.X[k+i*Size]+ab.X[i])*bw.X[i] - (aw.X[k+j*Size]+ab.X[j])*bw.X[j]
+				sum += x * x
+			}
+			distance[i*Size+j] = math.Sqrt(sum)
+		}
+	}
+	if *FlagDebug {
+		for i := 0; i < Size; i++ {
+			for j := 0; j < Size; j++ {
+				fmt.Printf("%f ", distance[i*Size+j])
+			}
+			fmt.Printf("\n")
+		}
+	}
+	minTotal, minLoop := math.MaxFloat64, make([]int, 0, 8)
+	for offset := 0; offset < Size; offset++ {
+		visited := [Size]bool{}
+		state := offset
+		visited[state] = true
+		total, loop := 0.0, make([]int, 0, 8)
+		loop = append(loop, state)
+		for i := 0; i < Size; i++ {
+			min, k := math.MaxFloat64, 0
+			done := true
+			for j := 0; j < Size; j++ {
+				if j == state || visited[j] {
+					continue
+				}
+				done = false
+				if v := distance[state*Size+j]; v < min {
+					min, k = v, j
+				}
+			}
+			if done {
+				loop = append(loop, loop[0])
+				break
+			}
+			state = k
+			visited[state] = true
+			loop = append(loop, state)
+		}
+		last := loop[0]
+		for _, node := range loop[1:] {
+			total += a[last*Size+node]
+			last = node
+		}
+		if total < minTotal && loop[0] == loop[Size] {
+			minTotal, minLoop = total, loop
+		}
+	}
+	if *FlagDebug {
+		fmt.Println(minTotal, minLoop)
+	}
+	return minTotal, minLoop
+}
+
 func test() (bool, bool) {
 	a := []float64{
 		0, 20, 42, 35,
@@ -740,6 +929,7 @@ func test() (bool, bool) {
 	total3, loop3 := Eigen2(a)
 	total4, loop4 := NearestNeighbor(a)
 	EigenKMeans(a)
+	total5, loop5 := Neural2(a)
 
 	ranks := mat.NewDense(Size, Size, nil)
 	for i := 0; i < Size; i++ {
@@ -753,10 +943,11 @@ func test() (bool, bool) {
 		fmt.Println("Eigen", total2, loop2)
 		fmt.Println("Eigen2", total3, loop3)
 		fmt.Println("NearestNeighbor", total4, loop4)
+		fmt.Println("Neural2", total5, loop5)
 		Reduction("results", ranks)
 	}
 
-	return total0 == total3, total0 == total4
+	return total0 == total5, total0 == total4
 }
 
 // Reduction reduces the matrix
