@@ -732,15 +732,18 @@ func Neural2(a []float64) (float64, []int) {
 
 	set := tf64.NewSet()
 	set.Add("aw", Size, Size)
-	set.Add("ab", Size)
 	set.Add("bw", Size, 1)
+	set.Add("ab", Size)
 	set.Add("bb", 1, 1)
 
-	for _, w := range set.Weights {
+	for _, w := range set.Weights[:2] {
 		factor := math.Sqrt(2.0 / float64(w.S[0]))
 		for i := 0; i < cap(w.X); i++ {
 			w.X = append(w.X, rand.NormFloat64()*factor)
 		}
+	}
+	for _, w := range set.Weights[2:] {
+		w.X = w.X[:cap(w.X)]
 	}
 
 	deltas := make([][]float64, 0, 8)
@@ -828,8 +831,8 @@ func Neural2(a []float64) (float64, []int) {
 	}
 
 	aw := set.Weights[0]
-	ab := set.Weights[1]
-	bw := set.Weights[2]
+	bw := set.Weights[1]
+	ab := set.Weights[2]
 	distance := make([]float64, Size*Size)
 	for i := 0; i < Size; i++ {
 		for j := 0; j < Size; j++ {
